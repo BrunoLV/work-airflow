@@ -14,7 +14,7 @@ from airflow.utils.dates import days_ago
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
-    "start_date": days_ago(14),
+    "start_date": days_ago(360),
 }
 
 dag = DAG(
