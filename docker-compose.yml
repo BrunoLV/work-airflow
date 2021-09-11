@@ -2,6 +2,30 @@ version: "3.8"
 
 services:
 
+  db_pokemon:
+    image: postgres:11.13-alpine
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_PASSWORD=pokemon
+      - POSTGRES_DB=pokemon
+      - POSTGRES_USER=pokemon
+    networks:
+      - pokemon_network
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  db_airflow:
+    image: postgres:11.13-alpine
+    ports:
+      - 5433:5432
+    environment:
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+      - POSTGRES_USER=airflow
+    networks:
+      - pokemon_network
+
   airflow:
     image: apache/airflow:1.10.15-python3.8
     ports:
@@ -10,30 +34,21 @@ services:
       - AIRFLOW_CONN_POKEMON_DB=postgresql+psycopg2://pokemon:pokemon@db_pokemon:5432/pokemon
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@db_airflow:5432/airflow
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__WEBSERVER__RBAC=True
+    networks:
+      - pokemon_network
     volumes:
       - ./dags/:/opt/airflow/dags/
     entrypoint: /bin/bash
     depends_on:
       - db_pokemon
       - db_airflow
-    command: -c '(airflow db init && airflow users create --username admin --password admin --firstname Anonymous --lastname Admin --email admin@example.org); airflow webserver & airflow scheduler'
+    links:
+      - "db_pokemon:db_pokemon"
+      - "db_airflow:db_airflow"
+    command: -c '(airflow db init && airflow users create --username admin --password admin --role Admin --firstname Anonymous --lastname Admin --email admin@example.org); airflow webserver & airflow scheduler'
+    restart: always
 
-  db_pokemon:
-    image: postgres:13.4-alpine
-    ports:
-      - 5432:5432
-    environment:
-      - POSTGRES_PASSWORD=pokemon
-      - POSTGRES_DB=pokemon
-      - POSTGRES_USER=pokemon
-    volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-
-  db_airflow:
-    image: postgres:13.4-alpine
-    ports:
-      - 5433:5432
-    environment:
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
-      - POSTGRES_USER=airflow
+networks:
+  pokemon_network:
+    driver: bridge
